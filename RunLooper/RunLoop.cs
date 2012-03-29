@@ -80,7 +80,7 @@ namespace RunLooper
                 };
         }
 
-        internal int ManagedThreadId
+        public int ManagedThreadId
         {
             get { return _thread.ManagedThreadId; }
         }
