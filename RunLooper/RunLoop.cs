@@ -20,8 +20,6 @@
 /** @mainpage RunLooper API Documentation
  * RunLooper is a utility library designed to help add a main thread run loop
  * to applications that lack one (such as console applications or libraries).
- * For more information, please see the RunLooper
- * portal at https://dracorp.assembla.com/spaces/runlooper.
  */
 
 //! @namespace RunLooper The primary RunLooper namespace.
