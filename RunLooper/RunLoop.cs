@@ -107,6 +107,7 @@ namespace RunLooper
             _thread.Join();
         }
 
+        // On cancel, this will continue to process until the queue is empty
         private void Run()
         {
             // Set the run loop thread's SynchronizationContext
@@ -119,18 +120,17 @@ namespace RunLooper
             if (_cancelAction != null) _cancelAction();
         }
 
-        // Processes one event in the queue and returns false if the queue was cancelled
+        // Processes one event in the queue and returns false if...
+        // blocking and the queue was cancelled AND is empty
+        // not blocking and the queue is empty
         private bool Process(bool block)
         {
-            // If we've requested to cancel the run loop, just return
-            if (_cancel.IsCancellationRequested) return false;
-            
             // Try to get an item off the queues in priority order without blocking
             IRunLoopItem item = null;
             if (_queues.FirstOrDefault(c => c.TryTake(out item)) == null)
             {
-                // If we don't want to block, just return
-                if (!block) return false;
+                // If we don't want to block or we've requested cancel, return false
+                if (!block || _cancel.IsCancellationRequested) return false;
 
                 // No items to take, so block until one of the queues gets an item
                 try
@@ -139,8 +139,8 @@ namespace RunLooper
                 }
                 catch (OperationCanceledException)
                 {
-                    // If we've canceled, return false
-                    return false;
+                    // If we've canceled, return true (so we can come around again to clear out the queue)
+                    return true;
                 }
             }
 
