@@ -184,7 +184,11 @@ namespace RunLooper
                     if(_mono)
                     {
                         // This is an alternative that works under Mono
-                        while (_queues.FirstOrDefault(c => c.TryTake(out item)) == null) { Thread.Sleep(0); }
+                        while (_queues.FirstOrDefault(c => c.TryTake(out item)) == null)
+                        {
+                            _cancel.Token.ThrowIfCancellationRequested();
+                            Thread.Sleep(0);
+                        }
                     }
                     else
                     {
