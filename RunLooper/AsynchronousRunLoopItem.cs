@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Reflection;
 
 namespace RunLooper
 {
@@ -25,8 +26,8 @@ namespace RunLooper
     /// </summary>
     internal class AsynchronousRunLoopItem<TState, TResult> : RunLoopItem<TState, TResult>
     {
-        public AsynchronousRunLoopItem(Func<TState, TResult> func, TState state)
-            : base(func, state)
+        public AsynchronousRunLoopItem(Func<TState, TResult> func, TState state, MethodInfo method)
+            : base(func, state, method)
         {
         }
 

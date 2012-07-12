@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Reflection;
 
 namespace RunLooper
 {
@@ -26,12 +27,14 @@ namespace RunLooper
     {
         private readonly Func<TState, TResult> _func;
         private readonly TState _state;
+        private readonly MethodInfo _method;
         private TResult _result;
 
-        protected RunLoopItem(Func<TState, TResult> func, TState state)
+        protected RunLoopItem(Func<TState, TResult> func, TState state, MethodInfo method)
         {
             _func = func;
             _state = state;
+            _method = method ?? func.Method;
         }
 
         // The method implementors should use to execute the item
@@ -50,6 +53,11 @@ namespace RunLooper
         public TResult Result
         {
             get { return _result; }
+        }
+
+        public MethodInfo Method
+        {
+            get { return _method; }
         }
     }
 }

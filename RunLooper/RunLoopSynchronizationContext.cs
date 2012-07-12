@@ -38,7 +38,7 @@ namespace RunLooper
 
             // Create an item and use a lambda to convert the SendOrPostCallback to a Func<object,object>
             SynchronousRunLoopItem<object, object> item
-                = new SynchronousRunLoopItem<object, object>(s => { callback(s); return null; }, state);
+                = new SynchronousRunLoopItem<object, object>(s => { callback(s); return null; }, state, callback.Method);
 
             // Queue up the item at the highest priority (since we'll be waiting for it to finish)
             _runLoop.Enqueue(item, RunLoop.Priority.High);
@@ -56,7 +56,7 @@ namespace RunLooper
 
             // Create an item and use a lambda to convert the SendOrPostCallback to a Func<object,object>
             AsynchronousRunLoopItem<object, object> item
-                = new AsynchronousRunLoopItem<object, object>(s => { callback(s); return null; }, state);
+                = new AsynchronousRunLoopItem<object, object>(s => { callback(s); return null; }, state, callback.Method);
             
             // Queue up the item and do not wait for it to execute
             // Any unhandled exceptions will crash the main thread

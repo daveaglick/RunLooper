@@ -41,7 +41,7 @@ namespace RunLooper
             // Create an item and use a lambda to call TryExecuteTask()
             AsynchronousRunLoopItem<object, object> item
                 = new AsynchronousRunLoopItem<object, object>(
-                    s => { TryExecuteTask(task); return null; }, null);
+                    s => { TryExecuteTask(task); return null; }, null, null);
 
             // Queue up the item at the scheduler priority and do not wait for it to execute
             // Any unhandled exceptions should be caught by TryExecuteTask()
@@ -52,7 +52,7 @@ namespace RunLooper
         {
             // Create an item and use a lambda to call TryExecuteTask() and return it's result
             SynchronousRunLoopItem<object, object> item
-                = new SynchronousRunLoopItem<object, object>(s => TryExecuteTask(task), null);
+                = new SynchronousRunLoopItem<object, object>(s => TryExecuteTask(task), null, null);
 
             // Queue up the item at the highest priority (since we'll be waiting for it to finish)
             _runLoop.Enqueue(item, RunLoop.Priority.High);

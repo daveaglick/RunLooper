@@ -30,6 +30,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -81,6 +82,36 @@ namespace RunLooper
         public int ManagedThreadId
         {
             get { return _thread.ManagedThreadId; }
+        }
+
+        public class MethodEventArgs : EventArgs
+        {
+            public MethodInfo Method { get; private set; }
+
+            internal MethodEventArgs(MethodInfo method)
+            {
+                Method = method;
+            }
+        }
+
+        public class EnqueuedEventArgs : MethodEventArgs
+        {
+            public Priority Priority { get; private set; }
+
+            internal EnqueuedEventArgs(MethodInfo method, Priority priority)
+                : base(method)
+            {
+                Priority = priority;
+            }
+        }
+
+        public event EventHandler<EnqueuedEventArgs> Enqueued;
+        public event EventHandler<MethodEventArgs> BeforeEvaluate;
+        public event EventHandler<MethodEventArgs> AfterEvaluate;
+
+        public int GetQueuedCount(Priority priority)
+        {
+            return _queues[(int) priority].Count;
         }
 
         public void Start()
@@ -144,9 +175,17 @@ namespace RunLooper
                 }
             }
 
-            // Execute the item
-            item.Execute();
+            // Execute the item (should never be null, but you never know)
+            Evaluate(item);
             return true;
+        }
+
+        private void Evaluate(IRunLoopItem item)
+        {
+            if (item == null) return;
+            if (BeforeEvaluate != null) BeforeEvaluate(this, new MethodEventArgs(item.Method));
+            item.Execute();
+            if (AfterEvaluate != null) AfterEvaluate(this, new MethodEventArgs(item.Method));
         }
 
         /// <summary>
@@ -255,12 +294,14 @@ namespace RunLooper
             if (_cancel.IsCancellationRequested) throw new ObjectDisposedException("RunLoop");
             if (item == null) throw new ArgumentNullException("item");
 
+            if(Enqueued != null) Enqueued(this, new EnqueuedEventArgs(item.Method, priority));
+
             // If we're on the main thread and this is a synchronous request, execute immediately
             // otherwise we'll get a deadlock while the caller waits for the item to process in
             // the queue but never returns control to the RunLoop to actually process the queue
             if(item.Synchronous && Thread.CurrentThread.ManagedThreadId == ManagedThreadId)
             {
-                item.Execute();
+                Evaluate(item);
                 return;
             }
 
@@ -268,60 +309,65 @@ namespace RunLooper
             _queues[(int)priority].Add(item);
         }
 
-        private void Enqueue<TState>(Func<TState, object> func, TState state, Priority priority)
+        private void Enqueue<TState>(Func<TState, object> func, TState state, MethodInfo method, Priority priority)
         {
-            Enqueue(new AsynchronousRunLoopItem<TState, object>(func, state), priority);
+            Enqueue(new AsynchronousRunLoopItem<TState, object>(func, state, method), priority);
         }
 
         public void Enqueue(Action action)
         {
             if (action == null) throw new ArgumentNullException("action");
-            Enqueue<object>(s => { action(); return null; }, null, Priority.Normal);
+            Enqueue<object>(s => { action(); return null; }, null, action.Method, Priority.Normal);
         }
 
         public void Enqueue(Action action, Priority priority)
         {
             if (action == null) throw new ArgumentNullException("action");
-            Enqueue<object>(s => { action(); return null; }, null, priority);
+            Enqueue<object>(s => { action(); return null; }, null, action.Method, priority);
         }
 
         public void Enqueue<TState>(Action<TState> action, TState state)
         {
             if (action == null) throw new ArgumentNullException("action");
-            Enqueue(s => { action(s); return null; }, state, Priority.Normal);
+            Enqueue(s => { action(s); return null; }, state, action.Method, Priority.Normal);
         }
 
         public void Enqueue<TState>(Action<TState> action, TState state, Priority priority)
         {
             if (action == null) throw new ArgumentNullException("action");
-            Enqueue(s => { action(s); return null; }, state, priority);
+            Enqueue(s => { action(s); return null; }, state, action.Method, priority);
         }
 
         public void Execute(Action action)
         {
             if (action == null) throw new ArgumentNullException("action");
-            Execute<object, object>(s => { action(); return null; }, null);
+            Execute<object, object>(s => { action(); return null; }, null, action.Method);
         }
 
         public void Execute<TState>(Action<TState> action, TState state)
         {
             if (action == null) throw new ArgumentNullException("action");
-            Execute<TState, object>(s => { action(s); return null; }, state);
+            Execute<TState, object>(s => { action(s); return null; }, state, action.Method);
         }
 
         public TResult Execute<TResult>(Func<TResult> func)
         {
             if (func == null) throw new ArgumentNullException("func");
-            return Execute<object, TResult>(s => func(), null);
+            return Execute<object, TResult>(s => func(), null, func.Method);
         }
 
         public TResult Execute<TState, TResult>(Func<TState, TResult> func, TState state)
+        {
+            return Execute(func, state, func.Method);
+        }
+
+        private TResult Execute<TState, TResult>(Func<TState, TResult> func, TState state, MethodInfo method)
         {
             if (func == null) throw new ArgumentNullException("func");
 
             // Create an item and use a lambda to call the func and return it's result
             SynchronousRunLoopItem<TState, TResult> item
-                = new SynchronousRunLoopItem<TState, TResult>(func, state);
+                = new SynchronousRunLoopItem<TState, TResult>(func, state, method);
 
             // Queue up the item at the highest priority (since we'll be waiting for it to finish)
             Enqueue(item, Priority.High);

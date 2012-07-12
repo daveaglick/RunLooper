@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Reflection;
 using System.Threading;
 
 namespace RunLooper
@@ -29,8 +30,8 @@ namespace RunLooper
         private readonly ManualResetEvent _manualResetEvent = new ManualResetEvent(false);
         private Exception _exception = null;
 
-        public SynchronousRunLoopItem(Func<TState, TResult> func, TState state)
-            : base(func, state)
+        public SynchronousRunLoopItem(Func<TState, TResult> func, TState state, MethodInfo method)
+            : base(func, state, method)
         {
         }
 

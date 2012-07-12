@@ -15,11 +15,14 @@
  * 
  */
 
+using System.Reflection;
+
 namespace RunLooper
 {
     internal interface IRunLoopItem
     {
         void Execute();
         bool Synchronous { get; }
+        MethodInfo Method { get; }
     }
 }
