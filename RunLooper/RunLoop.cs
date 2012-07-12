@@ -48,9 +48,12 @@ namespace RunLooper
     {
         public enum Priority { High = 0, Normal = 1, Low = 2 }
 
+        private static bool _mono;
+
         private readonly Thread _thread;
         private readonly CancellationTokenSource _cancel = new CancellationTokenSource();
         private Action _cancelAction = null;
+        private volatile MethodInfo _currentMethod = null;
 
         private readonly BlockingCollection<IRunLoopItem>[] _queues = new []
             {
@@ -61,6 +64,11 @@ namespace RunLooper
 
         private readonly RunLoopSynchronizationContext _synchronizationContext;
         private readonly TaskScheduler[] _taskSchedulers;
+
+        static RunLoop()
+        {
+            _mono = (Type.GetType ("Mono.Runtime") != null); 
+        }
 
         public RunLoop() : this(null)
         {
@@ -112,6 +120,11 @@ namespace RunLooper
         public int GetQueuedCount(Priority priority)
         {
             return _queues[(int) priority].Count;
+        }
+
+        public MethodInfo CurrentMethod
+        {
+            get { return _currentMethod; }
         }
 
         public void Start()
@@ -166,7 +179,17 @@ namespace RunLooper
                 // No items to take, so block until one of the queues gets an item
                 try
                 {
-                    BlockingCollection<IRunLoopItem>.TakeFromAny(_queues, out item, _cancel.Token);
+                    // Mono has a broken BlockingCollection<T>.TakeFromAny right now so we can't use it
+                    // https://bugzilla.xamarin.com/show_bug.cgi?id=6095
+                    if(_mono)
+                    {
+                        // This is an alternative that works under Mono
+                        while (_queues.FirstOrDefault(c => c.TryTake(out item)) == null) { Thread.Sleep(0); }
+                    }
+                    else
+                    {
+                        BlockingCollection<IRunLoopItem>.TakeFromAny(_queues, out item, _cancel.Token);
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -184,7 +207,9 @@ namespace RunLooper
         {
             if (item == null) return;
             if (BeforeEvaluate != null) BeforeEvaluate(this, new MethodEventArgs(item.Method));
+            _currentMethod = item.Method;
             item.Execute();
+            _currentMethod = null;
             if (AfterEvaluate != null) AfterEvaluate(this, new MethodEventArgs(item.Method));
         }
 
